@@ -43,6 +43,10 @@ if (!has_key(g:emacsModeDict, 'shell-script'))
     let g:emacsModeDict['shell-script'] = 'sh'
 endif
 
+if (!has_key(g:emacsModeDict, 'makefile-gmake'))
+    let g:emacsModeDict['makefile-gmake'] = 'make'
+endif
+
 function! <SID>FindParameterValue(modeline, emacs_name, value)
     let pattern = '\c' . '\(^\|.*;\)\s*' . a:emacs_name . ':\s*\(' . a:value . '\)\s*\($\|;.*\)'
     if a:modeline =~ pattern
