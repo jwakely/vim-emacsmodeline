@@ -117,6 +117,10 @@ function! ParseEmacsModeLine()
             let value = substitute(modeline, '^ *\([^ ]*\) *$', '\L\1', '')
             if (has_key(g:emacsModeDict, value))
                 exec 'setlocal filetype=' .  g:emacsModeDict[value]
+                if (g:emacsModeDict[value] == 'cpp')
+                    exec 'setlocal cinoptions+=,{1s,>2s,n-1s'
+                    exec 'setlocal noet'
+                endif
             endif
 
             " Other emacs options seen in the wild include:
