@@ -36,6 +36,7 @@ endif
 
 if (!has_key(g:emacsModeDict, 'c++'))
     let g:emacsModeDict['c++'] = 'cpp'
+    let g:emacsModeDict['C++'] = 'cpp'
 endif
 
 if (!has_key(g:emacsModeDict, 'shell-script'))
