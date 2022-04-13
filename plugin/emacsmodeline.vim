@@ -2,8 +2,8 @@
 "
 " emacsmodeline.vim
 " Brief: Parse emacs mode line and setlocal in vim
-" Version: 0.1
-" Date: Dec 23, 2010
+" Version: 1.2
+" Date: Jun 07, 2015
 " Maintainer: Chris Pickel <sfiera@gmail.com>
 "
 " Installation: put this file under your ~/.vim/plugin/
@@ -14,7 +14,7 @@
 " -*- tab-width: 4 -*-
 "
 " Which is the same meaning as:
-" vim:shiftwidth=4:softtabstob=4:tabstop=4:
+" vim:tabstop=4:
 "
 " Revisions:
 "
@@ -23,6 +23,10 @@
 " 1.0, Dec 23, 2010:
 "  * Support for mode, fill-column, buffer-read-only, and indent-tabs-mode.
 "  * Maintainership taken up by Chris Pickel <sfiera@gmail.com>.
+" 1.1, Feb 20, 2013
+"  * Prevent an exploit.  Not seen in the wild, but likely to be used by vengeful emacs users.
+" 1.2, Jun 07, 2015:
+"  * More file support.  Let vim provide defaults.
 "
 
 " No attempt is made to support vim versions before 7.0.
@@ -30,21 +34,26 @@ if version < 700
     finish
 endif
 
+if (!exists("g:emacs_modelines"))
+    let g:emacs_modelines=5
+endif
+
 if (!exists('g:emacsModeDict'))
     let g:emacsModeDict = {}
 endif
 
+" Note: Entries to emacsModeDict must be lowercase. E. g. 'makefile' instead of 'Makefile'.
+
 if (!has_key(g:emacsModeDict, 'c++'))
     let g:emacsModeDict['c++'] = 'cpp'
-    let g:emacsModeDict['C++'] = 'cpp'
 endif
 
 if (!has_key(g:emacsModeDict, 'shell-script'))
     let g:emacsModeDict['shell-script'] = 'sh'
 endif
 
-if (!has_key(g:emacsModeDict, 'makefile-gmake'))
-    let g:emacsModeDict['makefile-gmake'] = 'make'
+if (!has_key(g:emacsModeDict, 'makefile'))
+    let g:emacsModeDict['makefile'] = 'make'
 endif
 
 function! <SID>FindParameterValue(modeline, emacs_name, value)
@@ -56,7 +65,7 @@ function! <SID>FindParameterValue(modeline, emacs_name, value)
 endfunc
 
 function! <SID>SetVimModeOption(modeline)
-    let value = <SID>FindParameterValue(a:modeline, 'mode', '\S\+')
+    let value = <SID>FindParameterValue(a:modeline, 'mode', '[A-Za-z_+-]\+')
     if strlen(value)
         let value = tolower(value)
         if (has_key(g:emacsModeDict, value))
@@ -70,7 +79,9 @@ function! <SID>SetVimNumberOption(modeline, emacs_name, vim_name)
     let value = <SID>FindParameterValue(a:modeline, a:emacs_name, '\d\+')
     if strlen(value)
         exec 'setlocal ' . a:vim_name . '=' . value
+        return 1
     endif
+    return 0
 endfunc
 
 function! <SID>SetVimToggleOption(modeline, emacs_name, vim_name, nil_value)
@@ -85,15 +96,10 @@ function! <SID>SetVimToggleOption(modeline, emacs_name, vim_name, nil_value)
 endfunc
 
 function! ParseEmacsModeLine()
-    " If &modeline is false, then don't try to detect modelines.
-    if ! &modeline
-        return
-    endif
-
-    " Prepare to scan the first and last &modelines lines.
+    " Prepare to scan the first and last g:emacs_modelines lines.
     let max = line("$")
-    if max > (&modelines * 2)
-        let lines = range(1, &modelines) + range(max - &modelines + 1, max)
+    if max > (g:emacs_modelines * 2)
+        let lines = range(1, g:emacs_modelines) + range(max - g:emacs_modelines + 1, max)
     else
         let lines = range(1, max)
     endif
@@ -107,9 +113,13 @@ function! ParseEmacsModeLine()
             call <SID>SetVimModeOption(modeline)
 
             call <SID>SetVimNumberOption(modeline, 'fill-column',        'textwidth')
-            call <SID>SetVimNumberOption(modeline, 'tab-width',          'shiftwidth')
-            call <SID>SetVimNumberOption(modeline, 'tab-width',          'softtabstop')
-            call <SID>SetVimNumberOption(modeline, 'tab-width',          'tabstop')
+            if <SID>SetVimNumberOption(modeline,   'tab-width',          'tabstop')
+                " - When shiftwidth is zero, the 'tabstop' value is used.
+                "   Use the shiftwidth() function to get the effective shiftwidth value.
+                " - When 'sts' is negative, the value of 'shiftwidth' is used.
+                setlocal shiftwidth=0
+                setlocal softtabstop=-1
+            endif
 
             call <SID>SetVimToggleOption(modeline, 'buffer-read-only',   'readonly',     0)
             call <SID>SetVimToggleOption(modeline, 'indent-tabs-mode',   'expandtab',    1)
@@ -118,8 +128,12 @@ function! ParseEmacsModeLine()
             if (has_key(g:emacsModeDict, value))
                 exec 'setlocal filetype=' .  g:emacsModeDict[value]
                 if (g:emacsModeDict[value] == 'cpp')
-                    exec 'setlocal cinoptions+=,{1s,>2s,n-1s'
-                    exec 'setlocal noet'
+                    " Custom settings for libstdc++ sources.
+                    " exec 'setlocal cinoptions+={1s,>2s,n-1s'
+                    " exec 'setlocal noet'
+
+                    " See https://github.com/mattkretz/vim-gnuindent
+                    exec 'SetupGnuIndent'
                 endif
             endif
 
